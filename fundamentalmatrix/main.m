@@ -35,12 +35,12 @@ image_width = 3000;        %px
 image_height = 2000;       %px
 origin = [0.5 -0.5];     %px
 
-principal_point = [(img_width - 1) / 2., -(img_height - 1) / 2.];
+principal_point = [(image_width - 1) / 2., -(image_height - 1) / 2.];
 
 calibration_matrix = [
     1 0 -principal_point(1);
     0 1 -principal_point(2);
-    0 0 -camera_const;
+    0 0 -camera_constant;
 ];
 
 [m,n] = size(p1);
