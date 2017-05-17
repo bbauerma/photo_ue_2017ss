@@ -1,5 +1,3 @@
-
-
 clc;
 format short;
 %=======================================================================
@@ -44,16 +42,27 @@ image_height = 2000;       %px
 origin = [0.5 -0.5];     %px
 
 principal_point = [(image_width - 1) / 2., -(image_height - 1) / 2.];
-
-calibration_matrix = [
+% =========================================================================
+% CALIBRATION MATRIX OF THE FIRST (C1) AND SECOND IMAGE (C2)
+% =========================================================================
+C1 = [
     1 0 -principal_point(1);
     0 1 -principal_point(2);
-    0 0 -camera_constant;
+    0 0 -camera_constant
 ];
 
+C2 = [
+    1 0 -principal_point(1);
+    0 1 -principal_point(2);
+    0 0 -camera_constant
+];
+
+% =========================================================================
+% CALCULATION OF THE FUNDAMENTALMATRIX
+% =========================================================================
 [m,n] = size(p1);
 
-% A contains the kronecker product of P2 and P1 in each row
+% contains the kronecker product of P2 and P1 in each row
 A = zeros(m,9);
 
 for k = 1:m
@@ -90,16 +99,77 @@ disp('FUNDAMENTALMATRIX DET = 0')
 F0 = U*S*V'
 
 %check if F / F1 are correct:
-epipolar_contradiction_F0 = 0;
-epipolar_contradiction_F = 0;
+epi_con_F0 = 0;
+epi_con_F = 0;
+
 for k = 1:m
     
     p1_hom_vec = [p1(k,2); p1(k,3); 1];
     p2_hom_vec = [p2(k,2); p2(k,3); 1];
     
-    epipolar_contradiction_F0 = epipolar_contradiction_F0 + transpose(p1_hom_vec)*F0*p2_hom_vec;
-    epipolar_contradiction_F = epipolar_contradiction_F + transpose(p1_hom_vec)*F*p2_hom_vec;
+    epi_con_F0 = epi_con_F0 + transpose(p1_hom_vec)*F0*p2_hom_vec;
+    epi_con_F = epi_con_F + transpose(p1_hom_vec)*F*p2_hom_vec;
 end
 
-avg_epi_con_F0 = epipolar_contradiction_F0 / m 
-avg_epi_con_F = epipolar_contradiction_F / m 
+avg_epi_con_F0 = epi_con_F0 / m 
+avg_epi_con_F = epi_con_F / m 
+
+% =========================================================================
+% CALCULATION OF THE EPIPOLS (GAUSS EQUATIONS)
+% =========================================================================
+% FROM KRAUSS AUFGABE 6.8-9 P.389
+% F = [0.000001 -0.000040 -0.008565; 0.000031 0.000039 -0.261240; -0.002044 0.263777 1]
+
+%E1
+A = [F(1,1) F(1,2);F(2,1) F(2,2);F(3,1) F(3,2)];
+b = [-F(1,3);-F(2,3);-F(3,3)];
+
+AT = transpose(A);
+ATA = AT * A;
+
+e1 = inv(ATA) * AT * b;
+
+%E2 
+FT = transpose(F);
+
+A = [FT(1,1) FT(1,2);FT(2,1) FT(2,2);FT(3,1) FT(3,2)];
+b = [-FT(1,3);-FT(2,3);-FT(3,3)];
+
+AT = transpose(A);
+ATA = AT * A;
+
+e2 = inv(ATA) * AT * b;
+
+e1(3,1) = 1
+e2(3,1) = 1
+
+% =========================================================================
+% RELATIVE ORIENTATION OF DEPENDENT IMAGES
+% =========================================================================
+E = inv(transpose(C1))*F*inv(C2);
+
+[U,S,V] = svd(E);
+
+Z2_1 = U(:,3)
+Z2_2 = U(:,2) * (-1)
+norm(Z2) %must be equal to 1
+
+ 
+W = [0 -1 0; 1 0 0; 0 0 1];
+
+R2_1 = U * W * transpose(V)
+R2_2 = U * transpose(W) * transpose(V)
+
+if det(R2_1) < 0
+    R2_1 = R2_1 * (-1);
+end
+
+if det(R2_2) < 0
+    R2_2 = R2_2 * (-1);
+end
+
+ p1_hom_vec = [p1(1,2); p1(1,3); 1];
+ p2_hom_vec = [p2(1,2); p2(1,3); 1];
+ 
+ C1 * p1_hom_vec
+ Z2_1 + R2_1 * C2 * p2_hom_vec
