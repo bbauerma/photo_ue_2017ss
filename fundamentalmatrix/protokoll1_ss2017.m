@@ -90,11 +90,16 @@ disp('FUNDAMENTALMATRIX DET = 0')
 F0 = U*S*V'
 
 %check if F / F1 are correct:
-% for k = 1:m
-%     
-%     p1_hom_vec = [p1(k,2); p1(k,3); 1];
-%     p2_hom_vec = [p2(k,2); p2(k,3); 1];
-%     
-%     epipolar_contradiction = transpose(p1_hom_vec)*F0*p2_hom_vec
-%     epipolar_contradiction = transpose(p1_hom_vec)*F*p2_hom_vec
-% end
+epipolar_contradiction_F0 = 0;
+epipolar_contradiction_F = 0;
+for k = 1:m
+    
+    p1_hom_vec = [p1(k,2); p1(k,3); 1];
+    p2_hom_vec = [p2(k,2); p2(k,3); 1];
+    
+    epipolar_contradiction_F0 = epipolar_contradiction_F0 + transpose(p1_hom_vec)*F0*p2_hom_vec;
+    epipolar_contradiction_F = epipolar_contradiction_F + transpose(p1_hom_vec)*F*p2_hom_vec;
+end
+
+avg_epi_con_F0 = epipolar_contradiction_F0 / m 
+avg_epi_con_F = epipolar_contradiction_F / m 
