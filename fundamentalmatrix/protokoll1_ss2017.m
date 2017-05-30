@@ -1,9 +1,17 @@
+% =========================================================================
+% PHOTOGRAMMETRIE VERTIEFUNG SS2017
+% PROTOKOLL 1 - FUNDAMENTALMATRIX
+%
+% NAME - MNR
+% ...
+% Sebastian Flöry - 0826399
+% =========================================================================
+
 clc;
 format short;
+
 %=======================================================================
-% test set used for controlling the results of the calculation of the
-% fundamentalmatrix; points can be found in KRAUSS - PHOTOGRAMMETRIE BAND 1
-% CHAPTER 4.3.1 - Page 219
+% TIEPOINTS IN BOTH IMAGES P1 AND P2
 % ======================================================================
 p1=[
 	54 1505.791 -934.224
@@ -35,13 +43,22 @@ p2=[
 	510 1505.277 -458.463
 ];
 
-camera_constant = 3400;   %px
+% =========================================================================
+if length(p1) < 8
+    error('At least 8 corresponding tiepoints are needed for the calculation of F')
+end
 
+if length(p1) ~= length(p2)
+    error('Please provide the same amount of tiepoints in both images...')
+end
+
+camera_constant = 3400;    %px
 image_width = 3000;        %px
 image_height = 2000;       %px
-origin = [0.5 -0.5];     %px
+origin = [0.5 -0.5];       %px
 
 principal_point = [(image_width - 1) / 2., -(image_height - 1) / 2.];
+
 % =========================================================================
 % CALIBRATION MATRIX OF THE FIRST (C1) AND SECOND IMAGE (C2)
 % =========================================================================
@@ -62,7 +79,9 @@ C2 = [
 % =========================================================================
 [m,n] = size(p1);
 
-% contains the kronecker product of P2 and P1 in each row
+% initialize A which will store the kronecker product of corresponding
+% tiepoints in each row; as we are using homogeneous coords the shape of
+% A will be [nr_of_tiepoints, 3]
 A = zeros(m,9);
 
 for k = 1:m
@@ -78,27 +97,26 @@ AT = transpose(A);
 AT_A = AT * A;
 
 %SVD - SINGLE VALUE DECOMPOSITION
-%fundamental matrix f is the eigenvector corresponding to the smallest
-%eigenvalue in s; as the eigenvalues in s are sorted DESC the smallest
-%is s[-1]; the resultung fundamentalmatrix f in general won't have
-%det(F) == 0
+%fundamental matrix F is the eigenvector corresponding to the smallest
+%eigenvalue in S; as the eigenvalues in S are sorted DESC the smallest
+%is S[-1]; therefore the corresponding eigenvector is V(:,end)
 
 [U,S,V] = svd(AT_A);
-
 f = [V(:,end)];
-
 F = reshape(f,[3,3]);
-disp('FUNDAMENTALMATRIX DET != 0')
-F = F / F(end,end)
+
+%as in general the determinatne of F won't be 0 we need to apply the SVD
+%again; thistime we set the smalles eigenvalue in S to zero; by
+%recalculating the fundamentalmatrix F0 using the adjusted eigenvalues we
+%get the closest singular matrix to the original F
 
 [U,S,V] = svd(F);
 
 S(end,end) = 0;
- 
-disp('FUNDAMENTALMATRIX DET = 0')
-F0 = U*S*V'
 
-%check if F / F1 are correct:
+F0 = U*S*V';
+
+%caclulate the epipolar contradictions with both fundamentalmatrices
 epi_con_F0 = 0;
 epi_con_F = 0;
 
@@ -111,54 +129,64 @@ for k = 1:m
     epi_con_F = epi_con_F + transpose(p1_hom_vec)*F*p2_hom_vec;
 end
 
-avg_epi_con_F0 = epi_con_F0 / m 
-avg_epi_con_F = epi_con_F / m 
+avg_epi_con_F0 = epi_con_F0 / m;
+avg_epi_con_F = epi_con_F / m;
+
 
 % =========================================================================
-% CALCULATION OF THE EPIPOLS (GAUSS EQUATIONS)
+% CALCULATION OF THE EPIPOLS (GAUSS EQUATIONS) - A*x = b
+% F * e2 = 0
+% F' * e1 = 0
 % =========================================================================
-% FROM KRAUSS AUFGABE 6.8-9 P.389
-% F = [0.000001 -0.000040 -0.008565; 0.000031 0.000039 -0.261240; -0.002044 0.263777 1]
 
 %E1
-A = [F(1,1) F(1,2);F(2,1) F(2,2);F(3,1) F(3,2)];
-b = [-F(1,3);-F(2,3);-F(3,3)];
+A = [F0(1,1) F0(1,2); F0(2,1) F0(2,2); F0(3,1) F0(3,2)];
+b = [-F0(1,3);-F0(2,3);-F0(3,3)];
 
-AT = transpose(A);
-ATA = AT * A;
-
-e1 = inv(ATA) * AT * b;
+%AT = transpose(A);
+%ATA = AT * A;
+%e1 = inv(ATA) * AT * b
+e1 = A\b;
+e1(3,1) = 1;
 
 %E2 
-FT = transpose(F);
+F0T = transpose(F0);
 
-A = [FT(1,1) FT(1,2);FT(2,1) FT(2,2);FT(3,1) FT(3,2)];
-b = [-FT(1,3);-FT(2,3);-FT(3,3)];
+A = [F0T(1,1) F0T(1,2);F0T(2,1) F0T(2,2);F0T(3,1) F0T(3,2)];
+b = [-F0T(1,3);-F0T(2,3);-F0T(3,3)];
 
-AT = transpose(A);
-ATA = AT * A;
+%AT = transpose(A);
+%ATA = AT * A;
+%e2 = inv(ATA) * AT * b;
+e2 = A\b;
+e2(3,1) = 1;
 
-e2 = inv(ATA) * AT * b;
-
-e1(3,1) = 1
-e2(3,1) = 1
 
 % =========================================================================
-% RELATIVE ORIENTATION OF DEPENDENT IMAGES
+% RELATIVE ORIENTATION OF DEPENDENT IMAGES (FOLGEBILDANSCHLUSS)
+% calculation of the exterior orientation based on the relative orientation
+% of dependent images; therfore the exterior parameters of the first image
+% are said to be zero; the parameters of the second image are relative to
+% this one
 % =========================================================================
-E = inv(transpose(C1))*F*inv(C2);
+R1 = eye(3);
+Z1 = [0;0;0];
+
+E = inv(transpose(C1))*F0*inv(C2);
 
 [U,S,V] = svd(E);
 
-Z2_1 = U(:,3)
-Z2_2 = U(:,2) * (-1)
-norm(Z2) %must be equal to 1
+Z2_1 = U(:,3);
+Z2_2 = U(:,3) * (-1);
 
- 
 W = [0 -1 0; 1 0 0; 0 0 1];
 
-R2_1 = U * W * transpose(V)
-R2_2 = U * transpose(W) * transpose(V)
+R2_1 = U * W * V;
+R2_2 = U * transpose(W) * V;
+
+%there are four different solutions for the combination of R2 / Z2; we
+%search for the one solution which indicates positive orientations of both
+%images
 
 if det(R2_1) < 0
     R2_1 = R2_1 * (-1);
@@ -168,8 +196,79 @@ if det(R2_2) < 0
     R2_2 = R2_2 * (-1);
 end
 
- p1_hom_vec = [p1(1,2); p1(1,3); 1];
- p2_hom_vec = [p2(1,2); p2(1,3); 1];
+p1_hom_vec = [p1(1,2); p1(1,3); 1];
+p2_hom_vec = [p2(1,2); p2(1,3); 1];
+
+%FIND THE CORRECT SOLUTION FOR R AND Z
+for i = 1:4
+    
+    if i == 1
+        Z2 = Z2_1;
+        R2 = R2_1;
+        
+    elseif i == 2
+        
+        Z2 = Z2_1;
+        R2 = R2_2;
+        
+    elseif i == 3
+        
+        Z2 = Z2_2;
+        R2 = R2_1;
+        
+    elseif i == 4
+        
+        Z2 = Z2_2;
+        R2 = R2_2;
+   
+    end
+    
+    S = C1 * p1_hom_vec;
+    Q = R2 * C2 * p2_hom_vec;
+    
+    A = [S(1) -Q(1); S(2) -Q(2); S(3) -Q(3)];
+    b = Z2;
+    
+    k = A\b;
+
+    if all(k > 0)
+        break
+        
+    end
+end
+
+% =========================================================================
+% DISPLAY OUTPUT
+% =========================================================================
+disp('FUNDAMENTALMATRIX WITH DET!=0')
+disp(F)
+disp(' ')
+disp('AVERAGE EPIPOLAR CONTRADIDCITON')
+disp(avg_epi_con_F)
+disp(' ')
+disp('------------------------------------')
+disp('FUNDAMENTALMATRIX WITH DET==0')
+disp(F0)
+disp(' ')
+disp('AVERAGE EPIPOLAR CONTRADIDCITON')
+disp(avg_epi_con_F0)
+disp(' ')
+disp(' ')
+disp('============================================================')
+disp('RELATIVE ORIENTATION OF DEPENDENT IMAGES (FOLGEBILDANSCHLUSS)')
+disp('============================================================')
+disp('[K1 ; K2]')
+disp(k)
+disp(' ')
+disp('R1 - ROTATION MATRIX IMAGE 1 ')
+disp(R1)
+disp(' ')
+disp('R2 - ROTATION MATRIX IMAGE 2 ')
+disp(R2)
+disp(' ')
+disp('Z1 - PROJECTION CENTER OF FIRST IMAGE IN GLOBAL COORDINATES ')
+disp(Z1)
+disp(' ')
+disp('Z2 - PROJECTION CENTER OF SECOND IMAGE IN GLOBAL COORDINATES ')
+disp(Z2)
  
- C1 * p1_hom_vec
- Z2_1 + R2_1 * C2 * p2_hom_vec
