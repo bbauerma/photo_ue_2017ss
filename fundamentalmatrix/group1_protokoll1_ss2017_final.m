@@ -5,6 +5,7 @@
 % NAME - MNR
 % ...
 % Sebastian Flöry - 0826399
+% Bernhard Bauer-Marschallinger - 0526855
 % =========================================================================
 
 clc;
@@ -148,8 +149,8 @@ b = [-F0(1,3);-F0(2,3);-F0(3,3)];
 %AT = transpose(A);
 %ATA = AT * A;
 %e1 = inv(ATA) * AT * b
-e1 = A\b;
-e1(3,1) = 1;
+e2 = A\b;
+e2(3,1) = 1;
 
 %E2 
 F0T = transpose(F0);
@@ -160,8 +161,8 @@ b = [-F0T(1,3);-F0T(2,3);-F0T(3,3)];
 %AT = transpose(A);
 %ATA = AT * A;
 %e2 = inv(ATA) * AT * b;
-e2 = A\b;
-e2(3,1) = 1;
+e1 = A\b;
+e1(3,1) = 1;
 
 
 % =========================================================================
@@ -184,8 +185,8 @@ Z2_2 = U(:,3) * (-1);
 
 W = [0 -1 0; 1 0 0; 0 0 1];
 
-R2_1 = U * W * V;
-R2_2 = U * transpose(W) * V;
+R2_1 = U * W * transpose(V);
+R2_2 = U * transpose(W) * transpose(V);
 
 % check for positive determinants of the R's
 if det(R2_1) < 0
@@ -203,7 +204,7 @@ end
 p1_hom_vec = [p1(1,2); p1(1,3); 1];
 p2_hom_vec = [p2(1,2); p2(1,3); 1];
 
-%FIND THE CORRECT SOLUTION FOR R AND Z
+%FIND THE CORRECT SOLUTION FOR R AND Z,
 for i = 1:4
     
     if i == 1
@@ -245,44 +246,17 @@ end
 % Target Point #88 in image coordinates
 % =========================================================================
 
-% test calculation for Z2
-e2_calc = inv(R1)*inv(C1)*(Z2-Z1);
-m = 1 / e2_calc(3);
-e2_calc = e2_calc * m
-diff = e2 - e2_calc;
-disp(diff)
+% check if e2 has the same image_2-coordinate of Z1
+z1 = projection(Z2, R2, C2, Z1);
+diff_e2 = e2(1:2) - z1;
+% check if e1 has the same image_1-coordinate of Z2
+z2 = projection(Z1, R1, C1, Z2);
+diff_e1 = e1(1:2) - z2;
 
-% test calculation for p54
-p54_gl_1 = R1*C1*[p1(1,2); p1(1,3); 1]
-p54_im1_1 = inv(R1)*inv(C1)*(p54_gl_1)
+p88_gl = [0.0 0.0 -1.0]';
 
-p54_gl_2 = R2*C2*[p2(1,2); p2(1,3); 1]
-p54_im2 = inv(R2)*inv(C2)*(p54_gl_2)
-
-XX = [0.0 0.0 -1.0]
-[x1,y1] = projection(Z1, R1, C1, XX)
-
-[x2,y2] = projection(Z2, R2, C2, XX)
-
-
-
-p88_gl = transpose([0.0 0.0 -1.0]);
-p88_im1 = inv(R1)*inv(C1)*p88_gl;
-m = 1 / p88_im1(3);
-p88_im1 = (p88_im1 * m);
-p88_im1 = p88_im1(1:2)
-% ...confirms that P88 has same image coordinate as Z1
-
-p88_im2 = inv(R2)*inv(C2)*p88_gl;
-m = 1 / p88_im2(3);
-p88_im2 = (p88_im2 * m);
-p88_im2 = p88_im2(1:2)
-
-% test calculation for Z1
-e1_calc =inv(R2)*inv(C2)*(Z1);
-m = 1 / e1_calc(3);
-diff = e1 - e1_calc * m;
-disp(diff)
+p88_im1 = projection(Z1, R1, C1, p88_gl);
+p88_im2 = projection(Z2, R2, C2, p88_gl);
 
 
 % =========================================================================
@@ -329,6 +303,24 @@ disp(Z1)
 disp(' ')
 disp('Z2 - PROJECTION CENTER OF SECOND IMAGE IN GLOBAL COORDINATES ')
 disp(Z2)
-
-
+disp(' ')
+disp(' ')
+disp('============================================================')
+disp('TEST: EPIPOLAR POINTS and IMAGE COORDs of PROJECTION CENTERs')
+disp('============================================================')
+disp('Difference of e1 and Z2 in Image_1')
+disp(diff_e1)
+disp(' ')
+disp('Difference of e2 and Z1 in Image_2')
+disp(diff_e2)
+disp(' ')
+disp(' ')
+disp('============================================================')
+disp('IMAGE COORDINATES of POINT 88')
+disp('============================================================')
+disp('P88 - in IMAGE 1')
+disp(p88_im1)
+disp(' ')
+disp('P88 - in IMAGE 2')
+disp(p88_im2)
 
